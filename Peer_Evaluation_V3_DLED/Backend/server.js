@@ -50,3 +50,4 @@ const startServer = async () => {
 };
 
 startServer();
+// Trigger nodemon restart

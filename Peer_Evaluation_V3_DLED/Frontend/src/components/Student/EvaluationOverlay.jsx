@@ -89,11 +89,14 @@ const EvaluationOverlay = ({
                 justifyContent: "space-between",
               }}
             >
-              <h2
-                style={{ marginBottom: "1rem", textAlign: "center", flex: 1 }}
-              >
-                Evaluation Form
-              </h2>
+              <div style={{ textAlign: "center", flex: 1 }}>
+                <h2 style={{ marginBottom: "0.2rem", color: "#4b3c70" }}>
+                  Anonymous Peer Review
+                </h2>
+                <div style={{ marginBottom: "1rem", fontSize: "0.9rem", color: "#666", fontWeight: "bold", background: "#e8eaf6", padding: "0.3rem 0.8rem", borderRadius: "12px", display: "inline-block" }}>
+                  Anonymous ID: {selectedEvaluation?.documentUniqueId || "Hidden"}
+                </div>
+              </div>
               <div style={{ display: "flex", gap: "1rem" }}>
                 <a
                   href={`http://localhost:5000/${selectedEvaluation?.documentPath}`}

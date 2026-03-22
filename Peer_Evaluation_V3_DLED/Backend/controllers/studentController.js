@@ -9,6 +9,7 @@ import { PeerEvaluation } from '../models/PeerEvaluation.js';
 import { TA } from '../models/TA.js';
 import { Ticket } from '../models/Ticket.js';
 import fs from 'fs';
+import crypto from 'crypto';
 
 export const getStudentDashboardStats = async (req, res) => {
   try {
@@ -257,7 +258,9 @@ export const uploadExamDocument = async (req, res) => {
 
     let uidMap = await UIDMap.findOne({ userId: studentId, examId });
     if (!uidMap) {
-      uidMap = await UIDMap.create({ uniqueId: studentId, userId: studentId, examId });
+      // Auto-Anonymization: Generate a random 8-character string mapped to this student
+      const anonymousId = "SUB-" + crypto.randomBytes(4).toString('hex').toUpperCase();
+      uidMap = await UIDMap.create({ uniqueId: anonymousId, userId: studentId, examId });
     }
 
     const existingDoc = await Document.findOne({
@@ -416,6 +419,40 @@ export const submitEvaluation = async (req, res) => {
     evaluation.evaluated_by = req.user._id;
 
     await evaluation.save();
+
+    // FEATURE: "Basic Math" Anomaly Detection (Fake AI)
+    // Runs automatically after a review is submitted to detect unfair grading
+    try {
+      if (evaluation.document) {
+        // Find if another peer has already completed an evaluation for this EXACT document
+        const otherEvals = await PeerEvaluation.find({
+          document: evaluation.document,
+          eval_status: 'completed',
+          _id: { $ne: evaluation._id }
+        });
+
+        if (otherEvals.length > 0) {
+          const otherEval = otherEvals[0];
+          const otherTotalMarks = otherEval.score.reduce((sum, mark) => sum + mark, 0);
+
+          // Calculate point gap
+          const diff = Math.abs(totalMarks - otherTotalMarks);
+          
+          // Anomaly threshold: 20% variance of total possible marks
+          const threshold = exam.totalMarks * 0.20;
+
+          if (diff > threshold) {
+            // Flag both for TA review by setting ticket = 1
+            evaluation.ticket = 1;
+            otherEval.ticket = 1;
+            await evaluation.save();
+            await otherEval.save();
+          }
+        }
+      }
+    } catch (anomalyErr) {
+      console.error("Anomaly Detection Error:", anomalyErr);
+    }
 
     res.status(200).json({ message: "Evaluation submitted successfully!" });
   } catch (error) {
