@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { FaEyeSlash, FaEye, FaHome, FaUser } from 'react-icons/fa';
+import { FaEyeSlash, FaEye, FaHome, FaUser, FaGoogle } from 'react-icons/fa';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { showMessage } from '../utils/Message';
+import { useGoogleLogin } from '@react-oauth/google';
 import '../styles/User/Login.css';
 
 export default function Login() {
@@ -11,6 +12,42 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+
+    const googleLogin = useGoogleLogin({
+        onSuccess: async (tokenResponse) => {
+            try {
+                setLoading(true);
+                const response = await fetch('http://localhost:5000/api/auth/google', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: tokenResponse.access_token }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    localStorage.setItem('userInfo', JSON.stringify(data));
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('role', data.role);
+
+                    if (data.role === 'admin') navigate('/admin');
+                    else if (data.role === 'teacher') navigate('/teacher');
+                    else navigate('/student');
+                    showMessage('Google login successful!', 'success');
+                } else {
+                    showMessage(data.message || 'Google login failed', 'error');
+                }
+            } catch (error) {
+                console.error('Google Auth error:', error);
+                showMessage('Google authentication failed.', 'error');
+            } finally {
+                setLoading(false);
+            }
+        },
+        onError: () => {
+            showMessage('Google login failed', 'error');
+        }
+    });
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -115,6 +152,21 @@ export default function Login() {
                         {loading ? 'Logging in...' : 'Login'}
                     </button>
                 </form>
+
+                <div className="login-divider">
+                    <span>OR</span>
+                </div>
+
+                <button
+                    type="button"
+                    className="login-google-btn"
+                    onClick={() => googleLogin()}
+                    disabled={loading}
+                >
+                    <FaGoogle className="google-icon" />
+                    Sign in with Google
+                </button>
+
                 <div className="login-register-row">
                     <span className="login-register-text">Don't have an account? </span>
                     <button

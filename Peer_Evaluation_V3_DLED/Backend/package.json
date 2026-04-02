@@ -19,6 +19,7 @@
     "dotenv": "^16.5.0",
     "email-validator": "^2.0.4",
     "express": "^5.1.0",
+    "google-auth-library": "^10.6.2",
     "jimp": "^0.16.1",
     "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.2",

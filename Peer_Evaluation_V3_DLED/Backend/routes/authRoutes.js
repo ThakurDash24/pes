@@ -9,6 +9,7 @@ import {
   sendVerificationCode,
   resendVerificationCode,
   verifyEmail,
+  googleAuth,
 } from "../controllers/authController.js";
 import { protect, adminOrTeacherOnly } from "../middleware/authMiddleware.js";
 
@@ -20,6 +21,7 @@ router.post("/login", loginUser);
 router.post("/send-verification-code", sendVerificationCode);
 router.post("/verify-email", verifyEmail);
 router.post("/resend-verification-code", resendVerificationCode);
+router.post("/google", googleAuth);
 
 // Protected route
 router.get("/profile", protect, getProfile);

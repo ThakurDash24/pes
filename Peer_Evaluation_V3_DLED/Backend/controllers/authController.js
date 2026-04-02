@@ -8,12 +8,8 @@ import { Course } from '../models/Course.js';
 import emailValidator from 'email-validator';
 import { Batch } from '../models/Batch.js';
 import { VerificationCode } from '../models/VerificationCode.js';
-
-const generateToken = (id, role) => {
-  return jwt.sign({ id, role }, process.env.JWT_SECRET || 'default_secret', {
-    expiresIn: '30d'
-  });
-};
+import client from '../config/googleClient.js';
+import generateToken from '../utils/generateToken.js';
 
 const generateVerificationCode = () => {
   return Math.floor(1000 + Math.random() * 9000).toString();
@@ -27,7 +23,7 @@ const validatePassword = (password) => {
   const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
 
   const errors = [];
-  
+
   if (password.length < minLength) {
     errors.push(`Password must be at least ${minLength} characters long`);
   }
@@ -161,9 +157,9 @@ export const verifyEmail = async (req, res) => {
       return res.status(400).json({ message: 'Email and verification code are required!' });
     }
 
-    const verificationRecord = await VerificationCode.findOne({ 
-      email, 
-      code 
+    const verificationRecord = await VerificationCode.findOne({
+      email,
+      code
     });
 
     if (!verificationRecord) {
@@ -172,15 +168,15 @@ export const verifyEmail = async (req, res) => {
 
     if (verificationRecord.expiresAt < new Date()) {
       await VerificationCode.deleteMany({ email });
-      
-      return res.status(400).json({ 
+
+      return res.status(400).json({
         message: 'Verification code has expired. Please start registration again.',
-        redirectToRegister: true 
+        redirectToRegister: true
       });
     }
 
     const { registrationData } = verificationRecord;
-    
+
     const existingUser = await User.findOne({ email: registrationData.email });
     if (existingUser) {
       await VerificationCode.deleteOne({ _id: verificationRecord._id });
@@ -277,17 +273,17 @@ export const resendVerificationCode = async (req, res) => {
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'User already exists with this email. Please login instead.',
-        redirectToLogin: true 
+        redirectToLogin: true
       });
     }
 
     const existingVerification = await VerificationCode.findOne({ email });
     if (!existingVerification) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'No pending registration found for this email. Please start registration again.',
-        redirectToRegister: true 
+        redirectToRegister: true
       });
     }
 
@@ -411,11 +407,11 @@ export const loginUser = async (req, res) => {
 
   try {
     const user = await User.findOne({ email });
-    
+
     if (!user) {
       const pendingRegistration = await VerificationCode.findOne({ email });
       if (pendingRegistration) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: 'Please complete your registration by verifying your email.',
           requiresVerification: true,
           email: email
@@ -456,7 +452,7 @@ export const loginUser = async (req, res) => {
 
       await sendEmail(email, 'Email Verification Required', verificationHtml);
 
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Please verify your email. We\'ve sent a verification code to your email.',
         requiresVerification: true,
         email: email
@@ -652,6 +648,49 @@ export const changePassword = async (req, res) => {
     res.status(200).json({ message: 'Password changed successfully! Logging out...' });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const googleAuth = async (req, res) => {
+  const { token } = req.body;
+
+  try {
+    const googleResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const payload = await googleResponse.json();
+
+    if (!payload.email) {
+      return res.status(401).json({ success: false, message: "Invalid Google token" });
+    }
+
+    let user = await User.findOne({ email: payload.email });
+
+    if (!user) {
+      user = await User.create({
+        name: payload.name,
+        email: payload.email,
+        password: crypto.randomBytes(16).toString('hex'), // Random strong password
+        role: "student", // default role, could be adjusted based on requirements
+        isVerified: true, 
+      });
+    }
+
+    res.json({
+      success: true,
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user._id, user.role),
+    });
+
+  } catch (err) {
+    console.error('Google Auth Error:', err);
+    res.status(401).json({
+      success: false,
+      message: "Invalid Google token",
+    });
   }
 };
 
